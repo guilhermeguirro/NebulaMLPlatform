@@ -1,0 +1,96 @@
+name: Deploy NebulaML to AWS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/aws/**'
+      - 'Dockerfile'
+      - 'app/**'
+      - 'services/**'
+      - '.github/workflows/deploy-aws.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECR_REPOSITORY: nebulaml-api
+  ECS_SERVICE: nebulaml-service
+  ECS_CLUSTER: nebulaml-cluster
+  ECS_TASK_DEFINITION: .github/workflows/aws-task-definition.json
+  CONTAINER_NAME: nebulaml-api
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build and push Docker image
+        id: build-image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-to: type=inline
+      
+      - name: Create/update ECR repository if it doesn't exist
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || \
+          aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }}
+      
+      - name: Create ECS cluster if it doesn't exist
+        run: |
+          aws ecs describe-clusters --clusters ${{ env.ECS_CLUSTER }} || \
+          aws ecs create-cluster --cluster-name ${{ env.ECS_CLUSTER }}
+      
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+      
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+      
+      - name: Get API URL
+        id: get-url
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?contains(LoadBalancerName, 'nebulaml')].DNSName" \
+            --output text)
+          echo "url=https://$ALB_DNS" >> $GITHUB_OUTPUT
+      
+      - name: Output Deployment Info
+        run: |
+          echo "🚀 Deployment completed successfully!"
+          echo "🔗 API URL: ${{ steps.get-url.outputs.url }}"
+          echo "⚠️ Note: It may take a few minutes for the API to be fully deployed and accessible." 

@@ -151,22 +151,57 @@ Deployment guides for AWS, GCP, and others are coming soon.
 
 NebulaML Platform can be deployed to AWS using the following methods:
 
-#### Using GitHub Actions 🔄
+#### Using GitHub Actions with OIDC 🔒
 
-1. Create AWS credentials:
+1. Set up OpenID Connect in AWS for GitHub Actions:
    ```bash
-   aws iam create-user --user-name nebulaml-github-actions
-   aws iam attach-user-policy --user-name nebulaml-github-actions --policy-arn arn:aws:iam::aws:policy/AmazonECR-FullAccess
-   aws iam attach-user-policy --user-name nebulaml-github-actions --policy-arn arn:aws:iam::aws:policy/AmazonECS-FullAccess
-   aws iam create-access-key --user-name nebulaml-github-actions
+   # Create an IAM OIDC provider for GitHub
+   aws iam create-open-id-connect-provider \
+     --url https://token.actions.githubusercontent.com \
+     --client-id-list sts.amazonaws.com \
+     --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+   
+   # Create an IAM role with the necessary permissions
+   aws iam create-role \
+     --role-name nebulaml-github-actions \
+     --assume-role-policy-document '{
+       "Version": "2012-10-17",
+       "Statement": [
+         {
+           "Effect": "Allow",
+           "Principal": {
+             "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+           },
+           "Action": "sts:AssumeRoleWithWebIdentity",
+           "Condition": {
+             "StringEquals": {
+               "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+             },
+             "StringLike": {
+               "token.actions.githubusercontent.com:sub": "repo:guilhermeguirro/NebulaMLPlatform:*"
+             }
+           }
+         }
+       ]
+     }'
+   
+   # Attach the necessary permissions to the role
+   aws iam attach-role-policy \
+     --role-name nebulaml-github-actions \
+     --policy-arn arn:aws:iam::aws:policy/AmazonECR-FullAccess
+   
+   aws iam attach-role-policy \
+     --role-name nebulaml-github-actions \
+     --policy-arn arn:aws:iam::aws:policy/AmazonECS-FullAccess
    ```
 
-2. Add AWS credentials to GitHub repository secrets:
-   - `AWS_ACCESS_KEY_ID`: Your AWS access key
-   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
+2. Add AWS role to GitHub repository secrets:
+   - `AWS_ROLE_TO_ASSUME`: The ARN of the IAM role (e.g., `arn:aws:iam::<ACCOUNT_ID>:role/nebulaml-github-actions`)
+
+3. Configure GitHub repository variables:
    - `AWS_REGION`: Your preferred AWS region (e.g., `us-east-1`)
 
-3. Trigger the workflow from GitHub Actions or push to the main branch
+4. Trigger the workflow from GitHub Actions or push to the main branch
 
 The workflow will:
 - Create an ECR repository
@@ -196,31 +231,63 @@ The workflow will:
 
 NebulaML Platform can be deployed to Google Cloud Platform using:
 
-#### Using GitHub Actions 🔄
+#### Using GitHub Actions with Workload Identity Federation 🔒
 
-1. Create a service account and key:
+1. Set up Workload Identity Federation for GitHub Actions:
    ```bash
-   gcloud iam service-accounts create nebulaml-github-actions
-   gcloud projects add-iam-policy-binding [YOUR_PROJECT_ID] \
-     --member="serviceAccount:nebulaml-github-actions@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
-     --role="roles/container.admin"
-   gcloud projects add-iam-policy-binding [YOUR_PROJECT_ID] \
-     --member="serviceAccount:nebulaml-github-actions@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+   # Create a Workload Identity Pool
+   gcloud iam workload-identity-pools create "github-actions-pool" \
+     --project="${PROJECT_ID}" \
+     --location="global" \
+     --display-name="GitHub Actions Pool"
+   
+   # Create a Workload Identity Provider in that pool
+   gcloud iam workload-identity-pools providers create-oidc "github-actions-provider" \
+     --project="${PROJECT_ID}" \
+     --location="global" \
+     --workload-identity-pool="github-actions-pool" \
+     --display-name="GitHub Actions Provider" \
+     --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+     --issuer-uri="https://token.actions.githubusercontent.com"
+   
+   # Create a service account for GitHub Actions
+   gcloud iam service-accounts create "github-actions-sa" \
+     --project="${PROJECT_ID}" \
+     --display-name="GitHub Actions Service Account"
+   
+   # Grant necessary roles to the service account
+   gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+     --member="serviceAccount:github-actions-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --role="roles/run.admin"
+   
+   gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+     --member="serviceAccount:github-actions-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
      --role="roles/storage.admin"
-   gcloud iam service-accounts keys create key.json \
-     --iam-account=nebulaml-github-actions@[YOUR_PROJECT_ID].iam.gserviceaccount.com
+   
+   gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+     --member="serviceAccount:github-actions-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --role="roles/iam.serviceAccountUser"
+   
+   # Allow the GitHub repository to impersonate the service account
+   gcloud iam service-accounts add-iam-policy-binding "github-actions-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --project="${PROJECT_ID}" \
+     --role="roles/iam.workloadIdentityUser" \
+     --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-pool/attribute.repository/guilhermeguirro/NebulaMLPlatform"
    ```
 
-2. Add the GCP service account key to GitHub repository secrets:
-   - `GCP_PROJECT_ID`: Your GCP project ID
-   - `GCP_SA_KEY`: The content of the key.json file
+2. Add GCP credentials to GitHub repository secrets:
+   - `GCP_WORKLOAD_IDENTITY_PROVIDER`: The full identifier of the Workload Identity Provider (format: `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider`)
+   - `GCP_SERVICE_ACCOUNT`: The email of the service account (e.g., `github-actions-sa@PROJECT_ID.iam.gserviceaccount.com`)
 
-3. Trigger the workflow from GitHub Actions
+3. Configure GitHub repository variables:
+   - `GCP_PROJECT_ID`: Your GCP project ID
+
+4. Trigger the workflow from GitHub Actions
 
 The workflow will:
+- Authenticate using Workload Identity Federation
 - Build and push the Docker image to Google Container Registry (GCR)
-- Deploy to Cloud Run or GKE
-- Set up HTTPS load balancing
+- Deploy to Cloud Run
 - Output the API URL
 
 #### Using Terraform for GCP 🏗️
@@ -236,7 +303,7 @@ The workflow will:
    terraform apply -var="project_id=[YOUR_PROJECT_ID]"
    ```
 
-## �� API Documentation
+## 📄 API Documentation
 
 Once deployed, the API documentation is available at `/docs` or `/redoc` endpoints.
 

@@ -1,0 +1,79 @@
+name: Deploy NebulaML to GCP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/gcp/**'
+      - 'Dockerfile'
+      - 'app/**'
+      - 'services/**'
+      - '.github/workflows/deploy-gcp.yml'
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  SERVICE_NAME: nebulaml-api
+  REGION: us-central1
+  GCR_REGISTRY: gcr.io
+  IMAGE_TAG: ${{ github.sha }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to GCP
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          install_components: 'gke-gcloud-auth-plugin'
+      
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker ${{ env.GCR_REGISTRY }} --quiet
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ env.GCR_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
+          cache-from: type=registry,ref=${{ env.GCR_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest
+          cache-to: type=inline
+      
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v1
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.GCR_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ env.IMAGE_TAG }}
+          flags: '--allow-unauthenticated --platform=managed --memory=1Gi --cpu=1 --min-instances=1 --max-instances=5 --cpu-throttling'
+          env_vars: |
+            API_HOST=0.0.0.0
+            API_PORT=8080
+            API_WORKERS=2
+            API_LOG_LEVEL=INFO
+      
+      - name: Output Deployment Info
+        run: |
+          echo "🚀 Deployment completed successfully!"
+          echo "🔗 API URL: ${{ steps.deploy.outputs.url }}"
+          echo "⚠️ Note: It may take a few minutes for the API to be fully deployed and accessible." 

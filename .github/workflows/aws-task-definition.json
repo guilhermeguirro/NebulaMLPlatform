@@ -1,0 +1,78 @@
+{
+  "family": "nebulaml-api",
+  "networkMode": "awsvpc",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "nebulaml-api",
+      "image": "REPOSITORY_URI:TAG",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/nebulaml-api",
+          "awslogs-region": "AWS_REGION",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "environment": [
+        {
+          "name": "API_HOST",
+          "value": "0.0.0.0"
+        },
+        {
+          "name": "API_PORT",
+          "value": "8000"
+        },
+        {
+          "name": "API_WORKERS",
+          "value": "2"
+        },
+        {
+          "name": "API_RELOAD",
+          "value": "false"
+        },
+        {
+          "name": "API_LOG_LEVEL",
+          "value": "INFO"
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:8000/api/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "cpu": 512,
+      "memory": 1024,
+      "memoryReservation": 512
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048",
+  "tags": [
+    {
+      "key": "Project",
+      "value": "NebulaML"
+    },
+    {
+      "key": "Environment",
+      "value": "Production"
+    }
+  ]
+} 
