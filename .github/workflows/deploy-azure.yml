@@ -42,10 +42,11 @@ jobs:
           ACR_USERNAME=$(az acr credential show --name ${{ env.REGISTRY_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --query username -o tsv)
           ACR_PASSWORD=$(az acr credential show --name ${{ env.REGISTRY_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --query "passwords[0].value" -o tsv)
           
-          echo "::set-output name=server::$ACR_SERVER"
-          echo "::set-output name=username::$ACR_USERNAME"
+          echo "server=$ACR_SERVER" >> $GITHUB_OUTPUT
+          echo "username=$ACR_USERNAME" >> $GITHUB_OUTPUT
+          # Mask the password to prevent it from showing in logs
           echo "::add-mask::$ACR_PASSWORD"
-          echo "::set-output name=password::$ACR_PASSWORD"
+          echo "password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -71,6 +72,7 @@ jobs:
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --template-file "./azure/aca-template.json" \
+            --name "aca-deployment" \
             --parameters \
               environment_name="${{ env.ENVIRONMENT_NAME }}" \
               location="${{ env.LOCATION }}" \
@@ -84,10 +86,10 @@ jobs:
         run: |
           API_URL=$(az deployment group show \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --name "aca-template" \
+            --name "aca-deployment" \
             --query "properties.outputs.apiUrl.value" \
             -o tsv)
-          echo "::set-output name=url::$API_URL"
+          echo "url=$API_URL" >> $GITHUB_OUTPUT
       
       - name: Output Deployment Info
         run: |
