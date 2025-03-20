@@ -1,78 +1,55 @@
 """
-Transaction data models for SecureFinStack platform.
+Transaction Models
 
-This module provides immutable data models for representing financial transactions
-with proper type annotations and validation.
+This module defines data models for financial transactions,
+following clean code principles and best practices.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
-from typing import Dict, FrozenSet, List, Optional, Tuple, TypedDict, Union
+from typing import Dict, Optional, Any
 from uuid import UUID
-
-# Immutable constants
-MAX_TRANSACTION_AMOUNT = 1_000_000.00
-RESTRICTED_COUNTRIES: FrozenSet[str] = frozenset(["NK", "IR", "CU", "SY"])
-ELEVATED_RISK_THRESHOLD = 50_000.00
-AUTHORIZED_CURRENCIES: FrozenSet[str] = frozenset(["USD", "EUR", "GBP", "JPY", "CAD"])
-
-
-class TransactionStatus(Enum):
-    """Status of a financial transaction."""
-    PENDING = auto()
-    APPROVED = auto()
-    REJECTED = auto()
-    FLAGGED_FOR_REVIEW = auto()
-    COMPLETED = auto()
-    REFUNDED = auto()
-    FAILED = auto()
 
 
 class TransactionType(Enum):
-    """Type of financial transaction."""
+    """Types of financial transactions."""
     PAYMENT = auto()
     TRANSFER = auto()
-    WITHDRAWAL = auto()
     DEPOSIT = auto()
-    FEE = auto()
+    WITHDRAWAL = auto()
     REFUND = auto()
+    FEE = auto()
     ADJUSTMENT = auto()
 
 
+class TransactionStatus(Enum):
+    """Status of a transaction in its lifecycle."""
+    PENDING = auto()
+    PROCESSING = auto()
+    COMPLETED = auto()
+    FAILED = auto()
+    BLOCKED = auto()
+    REVERSED = auto()
+    CANCELLED = auto()
+
+
 class RiskLevel(Enum):
-    """Risk level assigned to a transaction."""
+    """Risk classification for transactions."""
+    NONE = auto()
     LOW = auto()
     MEDIUM = auto()
     HIGH = auto()
     CRITICAL = auto()
 
 
-class TransactionPartyInfo(TypedDict):
-    """Information about a party involved in a transaction."""
-    id: str
-    name: str
-    country_code: str
-    account_id: str
-    institution_id: Optional[str]
-
-
-@dataclass(frozen=True)
+@dataclass
 class Transaction:
     """
-    Immutable representation of a financial transaction.
+    Represents a financial transaction.
     
-    Attributes:
-        id: Unique identifier for the transaction
-        amount: Transaction amount
-        currency: Currency code (ISO 4217)
-        timestamp: When the transaction was initiated
-        type: Type of transaction
-        status: Current status of the transaction
-        sender: Information about the sending party
-        recipient: Information about the receiving party
-        reference: Optional reference code
-        risk_score: Calculated risk score (0.0-1.0)
+    This model captures all essential information about a transaction
+    including its status, parties involved, and risk assessment.
     """
     id: UUID
     amount: float
@@ -80,100 +57,15 @@ class Transaction:
     timestamp: datetime
     type: TransactionType
     status: TransactionStatus
-    sender: TransactionPartyInfo
-    recipient: TransactionPartyInfo
+    sender: Dict[str, Any]
+    recipient: Dict[str, Any]
     reference: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
     risk_score: Optional[float] = None
+    risk_level: Optional[RiskLevel] = None
     
-    def __post_init__(self) -> None:
-        """Validate transaction data on initialization."""
-        object.__setattr__(self, "risk_score", self._calculate_risk_score())
-        
-        # Validate currency
-        if self.currency not in AUTHORIZED_CURRENCIES:
-            raise ValueError(f"Currency {self.currency} is not supported")
-        
-        # Validate amount
-        if self.amount <= 0:
-            raise ValueError("Transaction amount must be positive")
-        
-        if self.amount > MAX_TRANSACTION_AMOUNT:
-            raise ValueError(f"Amount exceeds maximum allowed: {MAX_TRANSACTION_AMOUNT}")
-    
-    def _calculate_risk_score(self) -> float:
-        """
-        Calculate risk score based on transaction attributes.
-        
-        Returns:
-            float: Risk score between 0.0 and 1.0
-        """
-        score = 0.0
-        
-        # Check amount
-        if self.amount > ELEVATED_RISK_THRESHOLD:
-            score += 0.3
-        
-        # Check countries
-        sender_country = self.sender["country_code"]
-        recipient_country = self.recipient["country_code"]
-        
-        if sender_country in RESTRICTED_COUNTRIES or recipient_country in RESTRICTED_COUNTRIES:
-            score += 0.5
-        
-        # Cross-border check
-        if sender_country != recipient_country:
-            score += 0.2
-        
-        return min(score, 1.0)
-    
-    def with_updated_status(self, new_status: TransactionStatus) -> "Transaction":
-        """
-        Return a new Transaction with updated status.
-        
-        Args:
-            new_status: The new transaction status
-            
-        Returns:
-            A new Transaction instance with the updated status
-        """
-        return Transaction(
-            id=self.id,
-            amount=self.amount,
-            currency=self.currency,
-            timestamp=self.timestamp,
-            type=self.type,
-            status=new_status,
-            sender=self.sender,
-            recipient=self.recipient,
-            reference=self.reference
-        )
-    
-    def get_risk_level(self) -> RiskLevel:
-        """
-        Determine risk level based on risk score.
-        
-        Returns:
-            RiskLevel: The calculated risk level
-        """
-        if self.risk_score is None:
-            return RiskLevel.LOW
-            
-        if self.risk_score < 0.3:
-            return RiskLevel.LOW
-        elif self.risk_score < 0.6:
-            return RiskLevel.MEDIUM
-        elif self.risk_score < 0.8:
-            return RiskLevel.HIGH
-        else:
-            return RiskLevel.CRITICAL
-    
-    def to_dict(self) -> Dict:
-        """
-        Convert transaction to dictionary representation.
-        
-        Returns:
-            Dictionary representation of the transaction
-        """
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert transaction to dictionary representation."""
         return {
             "id": str(self.id),
             "amount": self.amount,
@@ -184,32 +76,41 @@ class Transaction:
             "sender": self.sender,
             "recipient": self.recipient,
             "reference": self.reference,
+            "metadata": self.metadata,
             "risk_score": self.risk_score,
-            "risk_level": self.get_risk_level().name
+            "risk_level": self.risk_level.name if self.risk_level else None
         }
-
-
-def categorize_transactions(
-    transactions: List[Transaction]
-) -> Dict[RiskLevel, List[Transaction]]:
-    """
-    Categorize transactions by risk level.
     
-    Args:
-        transactions: List of transactions to categorize
-        
-    Returns:
-        Dictionary mapping risk levels to lists of transactions
-    """
-    result: Dict[RiskLevel, List[Transaction]] = {
-        RiskLevel.LOW: [],
-        RiskLevel.MEDIUM: [],
-        RiskLevel.HIGH: [],
-        RiskLevel.CRITICAL: []
-    }
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Transaction':
+        """Create transaction from dictionary representation."""
+        return cls(
+            id=UUID(data["id"]),
+            amount=data["amount"],
+            currency=data["currency"],
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+            type=TransactionType[data["type"]],
+            status=TransactionStatus[data["status"]],
+            sender=data["sender"],
+            recipient=data["recipient"],
+            reference=data.get("reference"),
+            metadata=data.get("metadata", {}),
+            risk_score=data.get("risk_score"),
+            risk_level=RiskLevel[data["risk_level"]] if data.get("risk_level") else None
+        )
     
-    for transaction in transactions:
-        risk_level = transaction.get_risk_level()
-        result[risk_level].append(transaction)
+    def is_cross_border(self) -> bool:
+        """Determine if the transaction crosses country borders."""
+        return self.sender.get("country_code") != self.recipient.get("country_code")
     
-    return result 
+    def is_high_value(self, threshold: float = 10000.0) -> bool:
+        """Determine if the transaction is considered high value."""
+        return self.amount >= threshold
+    
+    def is_high_risk(self) -> bool:
+        """Determine if the transaction is considered high risk."""
+        if self.risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+            return True
+        if self.risk_score is not None and self.risk_score >= 0.7:
+            return True
+        return False 

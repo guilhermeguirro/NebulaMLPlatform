@@ -3,13 +3,13 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "securefinstack"
+name = "neutronpay"
 version = "0.1.0"
-description = "A production-grade secure financial services platform"
+description = "A secure, scalable, and compliant financial services platform"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
 license = "MIT"
-repository = "https://github.com/yourusername/securefinstack"
+repository = "https://github.com/yourusername/neutronpay"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Financial and Insurance Industry",
