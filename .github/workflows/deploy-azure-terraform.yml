@@ -1,0 +1,145 @@
+name: Deploy NebulaML to Azure with Terraform
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: nebulaml-rg
+  LOCATION: eastus
+  ACR_NAME: nebulamlregistry
+  ENVIRONMENT_NAME: nebulaml-env
+  API_IMAGE_TAG: ${{ github.sha }}
+  TF_STATE_STORAGE_ACCOUNT: nebulamlstatesa
+  TF_STATE_CONTAINER: tfstate
+  TF_STATE_KEY: nebulaml.tfstate
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform State Storage
+        run: |
+          # Create resource group if it doesn't exist
+          az group create --name ${{ env.RESOURCE_GROUP }} --location ${{ env.LOCATION }}
+          
+          # Create storage account if it doesn't exist
+          az storage account create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.TF_STATE_STORAGE_ACCOUNT }} \
+            --sku Standard_LRS \
+            --encryption-services blob
+          
+          # Get storage account key
+          ACCOUNT_KEY=$(az storage account keys list \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --account-name ${{ env.TF_STATE_STORAGE_ACCOUNT }} \
+            --query '[0].value' -o tsv)
+          
+          # Create blob container if it doesn't exist
+          az storage container create \
+            --name ${{ env.TF_STATE_CONTAINER }} \
+            --account-name ${{ env.TF_STATE_STORAGE_ACCOUNT }} \
+            --account-key ${ACCOUNT_KEY}
+          
+          # Create backend.tf file
+          cat > terraform/backend.tf << EOF
+          terraform {
+            backend "azurerm" {
+              resource_group_name  = "${{ env.RESOURCE_GROUP }}"
+              storage_account_name = "${{ env.TF_STATE_STORAGE_ACCOUNT }}"
+              container_name       = "${{ env.TF_STATE_CONTAINER }}"
+              key                  = "${{ env.TF_STATE_KEY }}"
+            }
+          }
+          EOF
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.0.11
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Validate
+        run: |
+          cd terraform
+          terraform validate
+
+      - name: Terraform Plan
+        run: |
+          cd terraform
+          terraform plan \
+            -var="resource_group_name=${{ env.RESOURCE_GROUP }}" \
+            -var="location=${{ env.LOCATION }}" \
+            -var="acr_name=${{ env.ACR_NAME }}" \
+            -var="environment_name=${{ env.ENVIRONMENT_NAME }}" \
+            -var="api_image_tag=${{ env.API_IMAGE_TAG }}"
+
+      - name: Terraform Apply
+        run: |
+          cd terraform
+          terraform apply -auto-approve \
+            -var="resource_group_name=${{ env.RESOURCE_GROUP }}" \
+            -var="location=${{ env.LOCATION }}" \
+            -var="acr_name=${{ env.ACR_NAME }}" \
+            -var="environment_name=${{ env.ENVIRONMENT_NAME }}" \
+            -var="api_image_tag=${{ env.API_IMAGE_TAG }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Get ACR Credentials
+        id: acr-creds
+        run: |
+          ACR_SERVER=$(az acr show --name ${{ env.ACR_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --query loginServer -o tsv)
+          ACR_USERNAME=$(az acr credential show --name ${{ env.ACR_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --query username -o tsv)
+          ACR_PASSWORD=$(az acr credential show --name ${{ env.ACR_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --query "passwords[0].value" -o tsv)
+          
+          echo "::set-output name=server::$ACR_SERVER"
+          echo "::set-output name=username::$ACR_USERNAME"
+          echo "::add-mask::$ACR_PASSWORD"
+          echo "::set-output name=password::$ACR_PASSWORD"
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ steps.acr-creds.outputs.server }}
+          username: ${{ steps.acr-creds.outputs.username }}
+          password: ${{ steps.acr-creds.outputs.password }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.acr-creds.outputs.server }}/nebulaml-api:${{ env.API_IMAGE_TAG }}
+          cache-from: type=registry,ref=${{ steps.acr-creds.outputs.server }}/nebulaml-api:latest
+          cache-to: type=inline
+      
+      - name: Get API URL
+        id: get-url
+        run: |
+          cd terraform
+          API_URL=$(terraform output -raw api_url)
+          echo "::set-output name=url::$API_URL"
+      
+      - name: Output Deployment Info
+        run: |
+          echo "Deployment completed successfully!"
+          echo "API URL: ${{ steps.get-url.outputs.url }}"
+          echo "Note: It may take a few minutes for the API to be fully deployed and accessible." 

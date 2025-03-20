@@ -1,126 +1,116 @@
 # NeutronPay
 
-A secure, scalable, and compliant financial services platform built with Python and modern cloud-native technologies.
+A secure, scalable, and compliant financial services platform built with modern technologies and best practices.
 
 ## Features
 
-- **Transaction Processing**: Secure and reliable transaction processing with real-time fraud detection
-- **Fraud Detection**: Machine learning-based fraud detection with explainable AI
-- **AI Services**: Integration with Claude and other AI services for advanced analytics
-- **API-First Design**: RESTful APIs with comprehensive documentation
-- **Cloud-Native Architecture**: Containerized microservices for scalability and resilience
-- **Monitoring & Observability**: Integrated metrics, logging, and tracing
+- **Secure Transaction Processing**: Enterprise-grade security with end-to-end encryption
+- **Fraud Detection**: Advanced AI-powered fraud detection and prevention
+- **Real-time Analytics**: Comprehensive monitoring and analytics dashboard
+- **Compliance**: Built-in compliance with financial regulations
+- **Scalability**: Designed for high throughput and reliability
+- **API-First**: RESTful API with OpenAPI documentation
 
-## Architecture
+## Tech Stack
 
-NeutronPay is built with a modular, service-oriented architecture:
-
-- **Transactions Service**: Core transaction processing and business logic
-- **Fraud Detection Service**: Real-time transaction risk assessment
-- **AI Service**: Advanced analytics and insights
-- **API Gateway**: Unified API interface with authentication and rate limiting
-
-## Technology Stack
-
-- **Backend**: Python 3.11, FastAPI, asyncio
-- **Data Storage**: PostgreSQL, Redis
-- **Containerization**: Docker, Docker Compose
-- **Observability**: Prometheus, Grafana, OpenTelemetry, Jaeger
-- **CI/CD**: GitHub Actions
-- **Security**: JWT Authentication, HTTPS, input validation
+- **Backend**: Python 3.11, FastAPI
+- **Database**: PostgreSQL
+- **Caching**: Redis
+- **Monitoring**: Prometheus, Grafana
+- **Tracing**: OpenTelemetry, Jaeger
+- **AI/ML**: Claude AI
+- **Security**: JWT, OAuth2, Encryption
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.10 or higher
 - Docker and Docker Compose
-- Make (optional, for using Makefile commands)
+- Poetry for dependency management
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/NeutronPay.git
-   cd NeutronPay
+   git clone https://github.com/yourusername/neutronpay.git
+   cd neutronpay
    ```
 
-2. Set up the environment:
+2. Install dependencies:
    ```bash
-   # Using Docker (recommended)
-   make docker-up
-   
-   # Or manually
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -e ".[dev]"
+   poetry install
    ```
 
-3. Run the application:
+3. Set up environment variables:
    ```bash
-   # Using Docker
-   make docker-up
-   
-   # Or manually
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. Start the services:
+   ```bash
+   docker-compose up -d
+   ```
+
+### Development
+
+1. Activate the virtual environment:
+   ```bash
+   poetry shell
+   ```
+
+2. Run the development server:
+   ```bash
    python -m app
    ```
 
-4. Access the API documentation:
+3. Run tests:
+   ```bash
+   pytest
    ```
-   http://localhost:8000/docs
-   ```
 
-## Development
+### API Documentation
 
-### Project Structure
+Once the server is running, you can access:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- OpenAPI Schema: http://localhost:8000/openapi.json
 
-```
-NeutronPay/
-├── services/            # Service modules
-│   ├── transactions/    # Transaction processing
-│   ├── fraud/           # Fraud detection
-│   └── ai/              # AI services
-├── config/              # Configuration files
-├── app.py               # Main application entry point
-├── docker-compose.yml   # Docker Compose configuration
-├── Dockerfile           # Docker build configuration
-└── Makefile             # Development commands
-```
+## Architecture
 
-### Available Commands
+The platform is built with a microservices architecture:
 
-```bash
-# Build and start all services
-make docker-up
+- **API Service**: Main FastAPI application
+- **AI Service**: Claude AI integration for analysis
+- **Fraud Detection Service**: Real-time fraud detection
+- **Transaction Service**: Transaction processing and management
 
-# Stop all services
-make docker-down
+## Security
 
-# Run tests
-make test
+- All API endpoints are protected with JWT authentication
+- Sensitive data is encrypted at rest and in transit
+- Rate limiting and request validation
+- Regular security audits and updates
 
-# Format code
-make format
+## Monitoring
 
-# Run linting
-make lint
-```
-
-## API Documentation
-
-The API documentation is available at `/docs` when the application is running.
-
-Key endpoints:
-
-- `POST /api/v1/transactions/` - Create a new transaction
-- `GET /api/v1/transactions/{id}` - Get transaction details
-- `POST /api/v1/fraud/detect` - Analyze a transaction for fraud
-- `POST /api/v1/ai/analyze` - Analyze transaction data using AI
+- Prometheus metrics endpoint: http://localhost:8000/metrics
+- Grafana dashboard: http://localhost:3000
+- Jaeger tracing: http://localhost:16686
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+For support, please open an issue in the GitHub repository or contact the maintainers. 

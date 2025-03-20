@@ -4,96 +4,153 @@ services:
   # API Service
   api:
     build:
-      context: ..
-      dockerfile: SecureFinStack/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "0.0.0.0:8001:8000"
     environment:
       - API_HOST=0.0.0.0
       - API_PORT=8000
-      - API_WORKERS=1
-      - CORS_ORIGINS=*
-      - LOG_LEVEL=INFO
+      - API_WORKERS=4
+      - API_RELOAD=true
+      - API_LOG_LEVEL=INFO
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_DB=securestack
-      - POSTGRES_USER=securestack
-      - POSTGRES_PASSWORD=securepassword
+      - POSTGRES_DB=nebulaml
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - VAULT_URL=${HCP_VAULT_URL}
+      - VAULT_TOKEN=${HCP_VAULT_TOKEN}
+      - VAULT_NAMESPACE=nebulaml
+      - VAULT_VERIFY_TLS=true
+      - VAULT_CERT_PATH=/vault/config/client.crt
+      - VAULT_KEY_PATH=/vault/config/client.key
+      - VAULT_CA_PATH=/vault/config/ca.crt
+      - VAULT_AUDIT_ENABLED=true
+      - VAULT_AUDIT_PATH=/vault/logs/audit.log
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     volumes:
-      - ./:/app
+      - type: bind
+        source: .
+        target: /app
+        read_only: true
+      - type: bind
+        source: ./vault/config
+        target: /vault/config
+        read_only: true
+      - type: tmpfs
+        target: /tmp/prometheus_multiproc
+    user: "${UID:-1000}:${GID:-1000}"
     depends_on:
       - redis
       - postgres
       - prometheus
+      - grafana
+      - jaeger
+    networks:
+      - nebulaml-network
 
   # Redis for caching and rate limiting
   redis:
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     ports:
-      - "6379:6379"
+      - "0.0.0.0:6379:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - nebulaml-network
 
   # PostgreSQL for persistent storage
   postgres:
     image: postgres:15-alpine
     ports:
-      - "5432:5432"
+      - "0.0.0.0:5433:5432"
     environment:
-      - POSTGRES_USER=securestack
-      - POSTGRES_PASSWORD=securepassword
-      - POSTGRES_DB=securestack
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=nebulaml
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nebulaml-network
 
   # Prometheus for metrics
   prometheus:
-    image: prom/prometheus:v2.42.0
+    image: prom/prometheus:v2.45.0
     ports:
-      - "9090:9090"
+      - "0.0.0.0:9090:9090"
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus:/etc/prometheus
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - nebulaml-network
 
   # Grafana for visualization
   grafana:
-    image: grafana/grafana:9.4.3
+    image: grafana/grafana:10.0.3
     ports:
-      - "3000:3000"
+      - "0.0.0.0:3001:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
+    networks:
+      - nebulaml-network
 
   # Jaeger for distributed tracing
   jaeger:
-    image: jaegertracing/all-in-one:1.39
+    image: jaegertracing/all-in-one:1.47
     ports:
-      - "5775:5775/udp"
-      - "6831:6831/udp"
-      - "6832:6832/udp"
-      - "5778:5778"
-      - "16686:16686"
-      - "14250:14250"
-      - "14268:14268"
-      - "14269:14269"
-      - "9411:9411"
+      - "0.0.0.0:6831:6831/udp"
+      - "0.0.0.0:6832:6832/udp"
+      - "0.0.0.0:5778:5778"
+      - "0.0.0.0:16686:16686"
+      - "0.0.0.0:4317:4317"
+      - "0.0.0.0:4318:4318"
+      - "0.0.0.0:14250:14250"
+      - "0.0.0.0:14268:14268"
+      - "0.0.0.0:14269:14269"
+      - "0.0.0.0:9411:9411"
     environment:
-      - COLLECTOR_ZIPKIN_HOST_PORT=9411
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+    volumes:
+      - jaeger_data:/tmp/jaeger
+    networks:
+      - nebulaml-network
+
+  # Portainer for container management
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: always
+    ports:
+      - "0.0.0.0:9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - nebulaml-network
 
 volumes:
   redis_data:
   postgres_data:
   prometheus_data:
-  grafana_data: 
+  grafana_data:
+  jaeger_data:
+  portainer_data:
+
+networks:
+  nebulaml-network:
+    driver: bridge 

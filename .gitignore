@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -16,55 +15,57 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# Virtual environments
+# Virtual Environment
+.env
+.venv
+env/
 venv/
 ENV/
-env/
-.env
 
-# IDE files
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
+.DS_Store
 
 # Logs
 *.log
 logs/
+log/
 
 # Database
-*.sqlite3
 *.db
+*.sqlite3
 
 # Docker
 .docker/
 
-# Jupyter Notebooks
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Jupyter Notebook
 .ipynb_checkpoints
 
-# Environment variables
-.env
+# Local development
 .env.local
-.env.development
-.env.test
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
 
-# OS specific
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db 

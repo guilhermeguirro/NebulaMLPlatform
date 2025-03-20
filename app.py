@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-SecureFinStack Main Application
+NebulaMLPlatform Main Application
 
-This module serves as the entry point for the SecureFinStack platform,
+This module serves as the entry point for the NebulaMLPlatform platform,
 integrating all components and providing a unified API.
 """
 
@@ -26,7 +26,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest, REGISTRY
 from prometheus_client.multiprocess import MultiProcessCollector
 from rich.console import Console
 from rich.logging import RichHandler
@@ -44,11 +44,11 @@ logging.basicConfig(
     datefmt="[%X]",
     handlers=[RichHandler(rich_tracebacks=True, console=console)]
 )
-logger = logging.getLogger("securestack")
+logger = logging.getLogger("NebulaMLPlatform")
 
 # Configure OpenTelemetry (if OTLP endpoint is provided)
 if "OTEL_EXPORTER_OTLP_ENDPOINT" in os.environ:
-    resource = Resource.create({"service.name": "securestack-api"})
+    resource = Resource.create({"service.name": "NebulaMLPlatform-api"})
     trace.set_tracer_provider(TracerProvider(resource=resource))
     span_processor = BatchSpanProcessor(
         OTLPSpanExporter(endpoint=os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"])
@@ -57,6 +57,7 @@ if "OTEL_EXPORTER_OTLP_ENDPOINT" in os.environ:
     logger.info(f"OpenTelemetry configured with endpoint: {os.environ['OTEL_EXPORTER_OTLP_ENDPOINT']}")
 
 # Prometheus metrics
+MultiProcessCollector(REGISTRY)
 REQUEST_COUNT = Counter(
     "api_requests_total",
     "Total count of API requests",
@@ -70,7 +71,7 @@ REQUEST_LATENCY = Counter(
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="SecureFinStack API",
+    title="NebulaMLPlatform API",
     description="Secure Financial Operations Platform API",
     version="1.0.0",
     docs_url=None,
@@ -183,7 +184,7 @@ if "OTEL_EXPORTER_OTLP_ENDPOINT" in os.environ:
 
 def main():
     """Main entry point for the application."""
-    logger.info("Starting SecureFinStack API")
+    logger.info("Starting NebulaMLPlatform API")
     
     # Get configuration from environment
     host = os.environ.get("API_HOST", "0.0.0.0")

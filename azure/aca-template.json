@@ -1,0 +1,182 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environment_name": {
+            "type": "string",
+            "defaultValue": "nebulaml-environment",
+            "metadata": {
+                "description": "Name of the Container Apps environment"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for the Container Apps environment"
+            }
+        },
+        "logAnalyticsWorkspaceName": {
+            "type": "string",
+            "defaultValue": "[format('logs-{0}', parameters('environment_name'))]",
+            "metadata": {
+                "description": "Name of the Log Analytics workspace"
+            }
+        },
+        "containerRegistryServer": {
+            "type": "string",
+            "metadata": {
+                "description": "Container Registry server URL"
+            }
+        },
+        "containerRegistryUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "Container Registry username"
+            }
+        },
+        "containerRegistryPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Container Registry password"
+            }
+        },
+        "apiImageTag": {
+            "type": "string",
+            "defaultValue": "latest",
+            "metadata": {
+                "description": "API image tag"
+            }
+        }
+    },
+    "variables": {
+        "logAnalyticsWorkspaceName": "[parameters('logAnalyticsWorkspaceName')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.OperationalInsights/workspaces",
+            "apiVersion": "2021-06-01",
+            "name": "[variables('logAnalyticsWorkspaceName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "sku": {
+                    "name": "PerGB2018"
+                },
+                "retentionInDays": 30,
+                "features": {
+                    "enableLogAccessUsingOnlyResourcePermissions": true
+                }
+            }
+        },
+        {
+            "type": "Microsoft.App/managedEnvironments",
+            "apiVersion": "2022-03-01",
+            "name": "[parameters('environment_name')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "appLogsConfiguration": {
+                    "destination": "log-analytics",
+                    "logAnalyticsConfiguration": {
+                        "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName')), '2021-06-01').customerId]",
+                        "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName')), '2021-06-01').primarySharedKey]"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.App/containerApps",
+            "apiVersion": "2022-03-01",
+            "name": "nebulaml-api",
+            "location": "[parameters('location')]",
+            "properties": {
+                "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environment_name'))]",
+                "configuration": {
+                    "activeRevisionsMode": "Single",
+                    "secrets": [
+                        {
+                            "name": "container-registry-password",
+                            "value": "[parameters('containerRegistryPassword')]"
+                        }
+                    ],
+                    "registries": [
+                        {
+                            "server": "[parameters('containerRegistryServer')]",
+                            "username": "[parameters('containerRegistryUsername')]",
+                            "passwordSecretRef": "container-registry-password"
+                        }
+                    ],
+                    "ingress": {
+                        "external": true,
+                        "targetPort": 8000,
+                        "traffic": [
+                            {
+                                "latestRevision": true,
+                                "weight": 100
+                            }
+                        ]
+                    }
+                },
+                "template": {
+                    "containers": [
+                        {
+                            "name": "nebulaml-api",
+                            "image": "[concat(parameters('containerRegistryServer'), '/nebulaml-api:', parameters('apiImageTag'))]",
+                            "resources": {
+                                "cpu": "0.5",
+                                "memory": "1Gi"
+                            },
+                            "env": [
+                                {
+                                    "name": "API_HOST",
+                                    "value": "0.0.0.0"
+                                },
+                                {
+                                    "name": "API_PORT",
+                                    "value": "8000"
+                                },
+                                {
+                                    "name": "API_WORKERS",
+                                    "value": "2"
+                                },
+                                {
+                                    "name": "API_RELOAD",
+                                    "value": "false"
+                                },
+                                {
+                                    "name": "API_LOG_LEVEL",
+                                    "value": "INFO"
+                                }
+                            ]
+                        }
+                    ],
+                    "scale": {
+                        "minReplicas": 1,
+                        "maxReplicas": 5,
+                        "rules": [
+                            {
+                                "name": "http-rule",
+                                "http": {
+                                    "metadata": {
+                                        "concurrentRequests": "50"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.App/managedEnvironments', parameters('environment_name'))]"
+            ]
+        }
+    ],
+    "outputs": {
+        "apiUrl": {
+            "type": "string",
+            "value": "[concat('https://', reference(resourceId('Microsoft.App/containerApps', 'nebulaml-api')).configuration.ingress.fqdn)]"
+        }
+    }
+} 

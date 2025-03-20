@@ -19,7 +19,7 @@ RUN apt-get update && \
 # Copy project files
 COPY pyproject.toml .
 COPY README.md .
-COPY SecureFinStack/ /app/
+COPY . /app/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -29,4 +29,4 @@ RUN pip install --no-cache-dir --upgrade pip && \
 EXPOSE 8000
 
 # Set entrypoint
-ENTRYPOINT ["python", "-m", "app"] 
+ENTRYPOINT ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"] 
