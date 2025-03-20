@@ -3,6 +3,12 @@ name: Deploy NebulaML to Azure
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'azure/**'
+      - 'Dockerfile'
+      - 'app/**'
+      - 'services/**'
+      - '.github/workflows/deploy-azure.yml'
   workflow_dispatch:
 
 env:
@@ -11,6 +17,12 @@ env:
   REGISTRY_NAME: nebulamlregistry
   ENVIRONMENT_NAME: nebulaml-env
   API_IMAGE_TAG: ${{ github.sha }}
+  KEY_VAULT_NAME: nebulaml-kv
+  AZURE_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   deploy:
@@ -22,17 +34,35 @@ jobs:
       - name: Setup Azure CLI
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION }}
 
       - name: Create Resource Group
         run: |
           az group create --name ${{ env.RESOURCE_GROUP }} --location ${{ env.LOCATION }}
+
+      - name: Create or Update Key Vault
+        run: |
+          # Check if Key Vault exists, if not create it
+          az keyvault show --name ${{ env.KEY_VAULT_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} || \
+          az keyvault create --name ${{ env.KEY_VAULT_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --location ${{ env.LOCATION }} --sku standard
+          
+          # Assign the current service principal access to the Key Vault
+          CURRENT_SP_OBJECT_ID=$(az ad signed-in-user show --query id -o tsv)
+          az keyvault set-policy --name ${{ env.KEY_VAULT_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --object-id $CURRENT_SP_OBJECT_ID \
+            --secret-permissions get list set delete \
+            --key-permissions get list create delete \
+            --certificate-permissions get list create delete
 
       - name: Deploy Azure Container Registry
         run: |
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --template-file "./azure/acr-template.json" \
+            --name "acr-deployment" \
             --parameters registryName="${{ env.REGISTRY_NAME }}" registryLocation="${{ env.LOCATION }}"
       
       - name: Get ACR Credentials
@@ -42,6 +72,12 @@ jobs:
           ACR_USERNAME=$(az acr credential show --name ${{ env.REGISTRY_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --query username -o tsv)
           ACR_PASSWORD=$(az acr credential show --name ${{ env.REGISTRY_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --query "passwords[0].value" -o tsv)
           
+          # Store credentials in Key Vault
+          az keyvault secret set --vault-name ${{ env.KEY_VAULT_NAME }} --name "acr-server" --value "$ACR_SERVER"
+          az keyvault secret set --vault-name ${{ env.KEY_VAULT_NAME }} --name "acr-username" --value "$ACR_USERNAME"
+          az keyvault secret set --vault-name ${{ env.KEY_VAULT_NAME }} --name "acr-password" --value "$ACR_PASSWORD"
+          
+          # Output for use in this workflow
           echo "server=$ACR_SERVER" >> $GITHUB_OUTPUT
           echo "username=$ACR_USERNAME" >> $GITHUB_OUTPUT
           # Mask the password to prevent it from showing in logs
@@ -69,6 +105,11 @@ jobs:
 
       - name: Deploy Container Apps
         run: |
+          # Get secrets from Key Vault for container app deployment
+          ACR_SERVER=$(az keyvault secret show --vault-name ${{ env.KEY_VAULT_NAME }} --name "acr-server" --query value -o tsv)
+          ACR_USERNAME=$(az keyvault secret show --vault-name ${{ env.KEY_VAULT_NAME }} --name "acr-username" --query value -o tsv)
+          ACR_PASSWORD=$(az keyvault secret show --vault-name ${{ env.KEY_VAULT_NAME }} --name "acr-password" --query value -o tsv)
+          
           az deployment group create \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --template-file "./azure/aca-template.json" \
@@ -76,10 +117,11 @@ jobs:
             --parameters \
               environment_name="${{ env.ENVIRONMENT_NAME }}" \
               location="${{ env.LOCATION }}" \
-              containerRegistryServer="${{ steps.acr-creds.outputs.server }}" \
-              containerRegistryUsername="${{ steps.acr-creds.outputs.username }}" \
-              containerRegistryPassword="${{ steps.acr-creds.outputs.password }}" \
-              apiImageTag="${{ env.API_IMAGE_TAG }}"
+              containerRegistryServer="$ACR_SERVER" \
+              containerRegistryUsername="$ACR_USERNAME" \
+              containerRegistryPassword="$ACR_PASSWORD" \
+              apiImageTag="${{ env.API_IMAGE_TAG }}" \
+              keyVaultName="${{ env.KEY_VAULT_NAME }}"
 
       - name: Get API URL
         id: get-url
@@ -89,10 +131,15 @@ jobs:
             --name "aca-deployment" \
             --query "properties.outputs.apiUrl.value" \
             -o tsv)
+          
+          # Store API URL in Key Vault
+          az keyvault secret set --vault-name ${{ env.KEY_VAULT_NAME }} --name "api-url" --value "$API_URL"
+          
           echo "url=$API_URL" >> $GITHUB_OUTPUT
       
       - name: Output Deployment Info
         run: |
-          echo "Deployment completed successfully!"
-          echo "API URL: ${{ steps.get-url.outputs.url }}"
-          echo "Note: It may take a few minutes for the API to be fully deployed and accessible." 
+          echo "🚀 Deployment completed successfully!"
+          echo "🔗 API URL: ${{ steps.get-url.outputs.url }}"
+          echo "🔐 Secrets are securely stored in Azure Key Vault: ${{ env.KEY_VAULT_NAME }}"
+          echo "⚠️ Note: It may take a few minutes for the API to be fully deployed and accessible." 

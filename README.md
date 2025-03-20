@@ -83,26 +83,59 @@ Configuration is managed through environment variables. See `docker-compose.yml`
 
 NebulaML Platform can be deployed to Azure using multiple methods:
 
-#### Using GitHub Actions (Recommended) 🔄
+#### Using GitHub Actions with Azure Key Vault (Recommended) 🔐
 
-The repository includes GitHub Actions workflows that automate the deployment process:
+The repository includes GitHub Actions workflows that automate the deployment process with enhanced security:
 
-1. Ensure you have an Azure account and subscription
-2. Create Azure service principal credentials:
+1. Set up Azure OpenID Connect (OIDC) for GitHub Actions:
    ```bash
-   az ad sp create-for-rbac --name "nebulaml-github-actions" \
-                           --role contributor \
-                           --scopes /subscriptions/<subscription-id> \
-                           --sdk-auth
+   # Create an Azure AD App Registration for GitHub Actions
+   APP_NAME="nebulaml-github-actions"
+   
+   # Create the application
+   APP_ID=$(az ad app create --display-name "$APP_NAME" --query appId -o tsv)
+   
+   # Create a service principal for the application
+   SP_ID=$(az ad sp create --id "$APP_ID" --query id -o tsv)
+   
+   # Get your subscription ID
+   SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+   
+   # Assign Contributor role to the service principal at subscription level
+   az role assignment create \
+     --role "Contributor" \
+     --assignee "$SP_ID" \
+     --scope "/subscriptions/$SUBSCRIPTION_ID"
+   
+   # Assign Key Vault Administrator role for managing Key Vault
+   az role assignment create \
+     --role "Key Vault Administrator" \
+     --assignee "$SP_ID" \
+     --scope "/subscriptions/$SUBSCRIPTION_ID"
+   
+   # Enable federated credentials (OIDC) for the application
+   az ad app federated-credential create \
+     --id "$APP_ID" \
+     --parameters "{\"name\":\"github-actions\",\"issuer\":\"https://token.actions.githubusercontent.com\",\"subject\":\"repo:guilhermeguirro/NebulaMLPlatform:ref:refs/heads/main\",\"audiences\":[\"api://AzureADTokenExchange\"]}"
    ```
-3. Add the JSON output as a GitHub repository secret named `AZURE_CREDENTIALS`
+
+2. Add the following GitHub repository secrets:
+   - `AZURE_CLIENT_ID`: The App ID from the app registration
+   - `AZURE_TENANT_ID`: Your Azure tenant ID
+
+3. Add the following GitHub repository variable:
+   - `AZURE_SUBSCRIPTION_ID`: Your Azure subscription ID
+
 4. Trigger the workflow manually from the GitHub Actions tab or push to the main branch
 
 The workflow will:
 - Create a resource group
+- Set up an Azure Key Vault to securely store all secrets
 - Deploy an Azure Container Registry
+- Store all ACR credentials in Key Vault
 - Build and push the Docker image
-- Deploy to Azure Container Apps
+- Deploy to Azure Container Apps with Key Vault integration
+- Use managed identities for secure credentials management
 - Output the API URL
 
 #### Using Azure CLI Script 📜

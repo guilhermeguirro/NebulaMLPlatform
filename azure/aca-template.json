@@ -47,10 +47,18 @@
             "metadata": {
                 "description": "API image tag"
             }
+        },
+        "keyVaultName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the Key Vault to integrate with"
+            }
         }
     },
     "variables": {
-        "logAnalyticsWorkspaceName": "[parameters('logAnalyticsWorkspaceName')]"
+        "logAnalyticsWorkspaceName": "[parameters('logAnalyticsWorkspaceName')]",
+        "keyVaultId": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+        "apiSecretName": "nebulaml-api-secret"
     },
     "resources": [
         {
@@ -87,10 +95,21 @@
             ]
         },
         {
+            "type": "Microsoft.KeyVault/vaults/secrets",
+            "apiVersion": "2021-06-01-preview",
+            "name": "[format('{0}/{1}', parameters('keyVaultName'), variables('apiSecretName'))]",
+            "properties": {
+                "value": "This is a sample API secret stored in Key Vault"
+            }
+        },
+        {
             "type": "Microsoft.App/containerApps",
             "apiVersion": "2022-03-01",
             "name": "nebulaml-api",
             "location": "[parameters('location')]",
+            "identity": {
+                "type": "SystemAssigned"
+            },
             "properties": {
                 "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environment_name'))]",
                 "configuration": {
@@ -99,6 +118,10 @@
                         {
                             "name": "container-registry-password",
                             "value": "[parameters('containerRegistryPassword')]"
+                        },
+                        {
+                            "name": "keyvault-api-secret",
+                            "keyVaultUrl": "[format('https://{0}.vault.azure.net/secrets/{1}', parameters('keyVaultName'), variables('apiSecretName'))]"
                         }
                     ],
                     "registries": [
@@ -148,6 +171,14 @@
                                 {
                                     "name": "API_LOG_LEVEL",
                                     "value": "INFO"
+                                },
+                                {
+                                    "name": "KEY_VAULT_NAME",
+                                    "value": "[parameters('keyVaultName')]"
+                                },
+                                {
+                                    "name": "API_SECRET",
+                                    "secretRef": "keyvault-api-secret"
                                 }
                             ]
                         }
@@ -169,7 +200,21 @@
                 }
             },
             "dependsOn": [
-                "[resourceId('Microsoft.App/managedEnvironments', parameters('environment_name'))]"
+                "[resourceId('Microsoft.App/managedEnvironments', parameters('environment_name'))]",
+                "[format('{0}/{1}', parameters('keyVaultName'), variables('apiSecretName'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Authorization/roleAssignments",
+            "apiVersion": "2020-04-01-preview",
+            "name": "[guid(resourceGroup().id, 'nebulaml-api', 'Key Vault Secrets User')]",
+            "properties": {
+                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]", 
+                "principalId": "[reference(resourceId('Microsoft.App/containerApps', 'nebulaml-api'), '2022-03-01', 'full').identity.principalId]",
+                "principalType": "ServicePrincipal"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.App/containerApps', 'nebulaml-api')]"
             ]
         }
     ],
@@ -177,6 +222,10 @@
         "apiUrl": {
             "type": "string",
             "value": "[concat('https://', reference(resourceId('Microsoft.App/containerApps', 'nebulaml-api')).configuration.ingress.fqdn)]"
+        },
+        "containerAppIdentity": {
+            "type": "string",
+            "value": "[reference(resourceId('Microsoft.App/containerApps', 'nebulaml-api'), '2022-03-01', 'full').identity.principalId]"
         }
     }
 } 
