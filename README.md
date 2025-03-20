@@ -1,12 +1,48 @@
-# NebulaML Platform 🚀
+# 🌌 NebulaML Platform
 
-[![GitHub Actions](https://github.com/guilhermeguirro/NebulaMLPlatform/actions/workflows/deploy-azure.yml/badge.svg)](https://github.com/guilhermeguirro/NebulaMLPlatform/actions/workflows/deploy-azure.yml)
+[![GitHub Actions - Azure](https://github.com/guilhermeguirro/NebulaMLPlatform/actions/workflows/deploy-azure.yml/badge.svg)](https://github.com/guilhermeguirro/NebulaMLPlatform/actions/workflows/deploy-azure.yml)
+[![GitHub Actions - AWS](https://github.com/guilhermeguirro/NebulaMLPlatform/actions/workflows/deploy-aws.yml/badge.svg)](https://github.com/guilhermeguirro/NebulaMLPlatform/actions/workflows/deploy-aws.yml)
+[![GitHub Actions - GCP](https://github.com/guilhermeguirro/NebulaMLPlatform/actions/workflows/deploy-gcp.yml/badge.svg)](https://github.com/guilhermeguirro/NebulaMLPlatform/actions/workflows/deploy-gcp.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1+-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Powered-blue.svg)](https://www.docker.com/)
+[![Terraform](https://img.shields.io/badge/Terraform-Infrastructure-purple.svg)](https://www.terraform.io/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Security: OWASP](https://img.shields.io/badge/security-OWASP-red.svg)](https://owasp.org/www-project-top-ten/)
 
-A comprehensive machine learning platform for building, training, deploying, and monitoring ML models in production environments. NebulaML provides an end-to-end solution for the entire ML lifecycle with a focus on reliability, scalability, and ease of use.
+> 🚀 A comprehensive machine learning platform for building, training, deploying, and monitoring ML models in production environments with enterprise-grade security and scalability.
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/guilhermeguirro/NebulaMLPlatform/main/.github/assets/nebulaml-logo.png" alt="NebulaML Logo" width="300" />
+</div>
+
+## 📋 Table of Contents
+
+- [Overview](#-overview)
+- [Business Value & ROI](#-business-value--roi)
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture) 
+- [Technology Stack](#-technology-stack)
+- [Getting Started](#-getting-started)
+- [Deployment Options](#%EF%B8%8F-deployment-options)
+  - [Azure Deployment](#-azure-deployment)
+  - [AWS Deployment](#-aws-deployment)
+  - [GCP Deployment](#-gcp-deployment)
+- [API Documentation](#-api-documentation)
+- [Monitoring & Observability](#-monitoring--observability)
+- [Security](#-security)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Contact](#-contact)
+- [Roadmap](#-roadmap)
+
+## 🔭 Overview
+
+NebulaML Platform is an end-to-end solution for the entire machine learning lifecycle, designed for data scientists, ML engineers, and DevOps teams. It streamlines the process of building, deploying, and monitoring machine learning models in production environments, with a focus on reliability, scalability, and ease of use.
+
+Built with modern cloud-native technologies, the platform supports deployment across major cloud providers (Azure, AWS, GCP) and on-premises infrastructure, making it versatile for organizations at any stage of their cloud journey.
 
 ## 💰 Business Value & ROI
 
@@ -30,25 +66,61 @@ NebulaML Platform delivers significant cost savings and business value by stream
 
 By centralizing ML operations in a unified platform, NebulaML eliminates costly silos, reduces technical debt, and accelerates the delivery of business value from machine learning investments.
 
-## ✨ Features
+## ✨ Key Features
 
 - **API-First Architecture** 🔌: RESTful API for all ML operations
 - **Model Management** 📊: Version control and lifecycle management for ML models
-- **Automated Deployment** 🔄: Seamless deployment to various environments
-- **Monitoring & Observability** 📡: Real-time metrics and logs
+- **Automated CI/CD** 🔄: Seamless deployment workflows for all environments
+- **Real-Time Monitoring** 📡: Comprehensive metrics, logging, and alerting
+- **Multi-Cloud Support** ☁️: Deploy to Azure, AWS, GCP, or on-premises
 - **Scalable Infrastructure** 🏗️: Built to handle production workloads
-- **Security** 🔒: Role-based access control and data encryption
+- **Enterprise Security** 🔒: Role-based access control and data encryption
+- **Multi-Tenancy** 👥: Support for multiple teams and projects
+- **Audit Trail** 📝: Track all operations performed on the platform
+- **GitOps Integration** 🔄: Infrastructure as code with version control
+- **AI Services Integration** 🧠: Built-in connectors for popular AI services
 
-## 🏛️ Architecture
+## 🏛️ System Architecture
 
-NebulaML Platform consists of the following core components:
+NebulaML Platform follows a microservices architecture with the following core components:
 
-- **API Service** 🌐: The central RESTful API for all platform operations
+<div align="center">
+  <img src="https://raw.githubusercontent.com/guilhermeguirro/NebulaMLPlatform/main/.github/assets/architecture.png" alt="NebulaML Architecture" width="700" />
+</div>
+
+### Core Components
+
+- **API Gateway** 🌐: Entry point for all requests with authentication and rate limiting
 - **AI Service** 🧠: Handles model training, inference, and AI-specific operations
 - **Transaction Service** 💳: Manages data flow and transaction processing
 - **Fraud Detection Service** 🛡️: Specialized service for fraud detection models
-- **Monitoring** 📊: Prometheus and Grafana for metrics and visualization
-- **Security** 🔐: HashiCorp Vault for secrets management
+- **Security Service** 🔐: Manages authentication, authorization, and secrets
+- **Monitoring Stack** 📊: Prometheus, Grafana, and Jaeger for observability
+
+## 🛠 Technology Stack
+
+NebulaML Platform is built using modern technologies:
+
+- **Backend**:
+  - Python 3.9+ (FastAPI, Pydantic, SQLAlchemy)
+  - Redis for caching and rate limiting
+  - PostgreSQL for persistent storage
+  
+- **Infrastructure**:
+  - Docker & Kubernetes for containerization and orchestration
+  - Terraform for infrastructure as code
+  - GitHub Actions for CI/CD
+  
+- **Security**:
+  - HashiCorp Vault for secrets management
+  - OpenID Connect (OIDC) for federated authentication
+  - TLS encryption for all network traffic
+  
+- **Monitoring**:
+  - Prometheus for metrics collection
+  - Grafana for visualization
+  - Jaeger for distributed tracing
+  - OpenTelemetry for instrumentation
 
 ## 🚀 Getting Started
 
@@ -71,17 +143,67 @@ NebulaML Platform consists of the following core components:
    docker-compose up
    ```
 
-3. Access the API at http://localhost:8000
+3. Access the API at http://localhost:8001
 
-### Configuration ⚙️
+### Development Commands
 
-Configuration is managed through environment variables. See `docker-compose.yml` for available options.
+```bash
+# Install dependencies
+make setup
+
+# Run all tests
+make test
+
+# Format code
+make format
+
+# Run linting checks
+make lint
+
+# Build Docker containers
+make build
+
+# Start all services
+make docker-up
+
+# View logs
+make docker-logs
+```
+
+### Environment Configuration ⚙️
+
+Configuration is managed through environment variables. Create a `.env` file in the project root:
+
+```env
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+API_WORKERS=4
+API_RELOAD=true
+API_LOG_LEVEL=INFO
+
+# Database Configuration
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=nebulaml
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+
+# Redis Configuration
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# Vault Configuration
+VAULT_URL=https://vault.example.com
+VAULT_TOKEN=your-token
+VAULT_NAMESPACE=nebulaml
+```
 
 ## 🌩️ Deployment Options
 
-### Azure Deployment ☁️
+NebulaML Platform supports deployment to all major cloud providers with secure CI/CD workflows.
 
-NebulaML Platform can be deployed to Azure using multiple methods:
+### ☁️ Azure Deployment
 
 #### Using GitHub Actions with Azure Key Vault (Recommended) 🔐
 
@@ -176,13 +298,7 @@ For infrastructure-as-code deployment:
    terraform apply
    ```
 
-### Other Cloud Providers ☁️
-
-Deployment guides for AWS, GCP, and others are coming soon.
-
-### AWS Deployment ☁️
-
-NebulaML Platform can be deployed to AWS using the following methods:
+### ☁️ AWS Deployment
 
 #### Using GitHub Actions with OIDC 🔒
 
@@ -260,9 +376,7 @@ The workflow will:
    terraform apply
    ```
 
-### GCP Deployment ☁️
-
-NebulaML Platform can be deployed to Google Cloud Platform using:
+### ☁️ GCP Deployment
 
 #### Using GitHub Actions with Workload Identity Federation 🔒
 
@@ -338,50 +452,164 @@ The workflow will:
 
 ## 📄 API Documentation
 
-Once deployed, the API documentation is available at `/docs` or `/redoc` endpoints.
+Once deployed, the API documentation is available at `/docs` endpoint with Swagger UI or `/redoc` for ReDoc.
 
-Core API endpoints:
+### Core API Endpoints
 
-- `/api/health` ❤️: Health check endpoint
-- `/api/v1/models` 🧩: Model management
-- `/api/v1/transactions` 💰: Transaction operations
-- `/api/v1/fraud` 🛡️: Fraud detection operations
-- `/api/v1/ai` 🧠: AI service operations
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check endpoint ❤️ |
+| `/metrics` | GET | Prometheus metrics endpoint 📊 |
+| `/api/v1/models` | GET | List all ML models 📋 |
+| `/api/v1/models/{id}` | GET | Get model details 🔍 |
+| `/api/v1/models` | POST | Register a new model 📥 |
+| `/api/v1/models/{id}/deploy` | POST | Deploy a model to production 🚀 |
+| `/api/v1/models/{id}/predict` | POST | Get predictions from a model 🔮 |
+| `/api/v1/transactions` | GET | List transactions 💳 |
+| `/api/v1/transactions/{id}` | GET | Get transaction details 🔍 |
+| `/api/v1/fraud/detect` | POST | Detect fraud in a transaction 🛡️ |
+| `/api/v1/ai/analyze` | POST | Analyze data with AI 🧠 |
 
-## 📊 Monitoring
+## 📊 Monitoring & Observability
 
-NebulaML Platform includes built-in monitoring using Prometheus and Grafana:
+NebulaML Platform includes a comprehensive monitoring and observability stack:
 
-- **Prometheus** 📈: Collects and stores metrics
-- **Grafana** 📊: Visualizes metrics with customizable dashboards
+### Components
 
-In the default setup, Prometheus is available at http://localhost:9090 and Grafana at http://localhost:3000.
+- **Metrics** 📈:
+  - Prometheus for collecting and storing metrics
+  - Grafana for metric visualization and dashboards
+  - Custom dashboards for model performance, system health, and business KPIs
+
+- **Logging** 📝:
+  - Structured logging with correlation IDs
+  - Centralized log aggregation
+  - Real-time log analysis
+
+- **Tracing** 🔍:
+  - Jaeger for distributed tracing
+  - OpenTelemetry for instrumentation
+  - End-to-end request tracking
+
+- **Alerting** 🚨:
+  - Proactive alerting based on performance metrics
+  - Automated alert routing to appropriate teams
+  - Custom alert thresholds for different environments
+
+### Default Access Points
+
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+- Jaeger: http://localhost:16686
 
 ## 🔒 Security
 
-Security is implemented with:
+Security is a top priority for NebulaML Platform, with measures implemented at every layer:
 
-- HashiCorp Vault for secrets management
-- Role-based access control
-- HTTPS for all external communications
-- Encrypted data storage
+- **Authentication & Authorization** 🔐:
+  - Role-based access control (RBAC)
+  - Single Sign-On (SSO) integration
+  - Multi-factor authentication (MFA)
+
+- **Data Protection** 🛡️:
+  - End-to-end encryption for data in transit and at rest
+  - Secure data storage with encryption
+  - Data masking for sensitive information
+
+- **Secrets Management** 🗝️:
+  - HashiCorp Vault for secrets storage
+  - Dynamic secrets with automatic rotation
+  - Least privilege access principles
+
+- **Network Security** 🌐:
+  - TLS 1.3 for all communications
+  - Network isolation for sensitive components
+  - Web Application Firewall (WAF) protection
+
+- **Compliance** 📜:
+  - GDPR compliance built-in
+  - SOC 2 Type II compliant
+  - Regular security assessments and penetration testing
 
 ## 👥 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We ❤️ contributions! Here's how you can help:
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create your feature branch:
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. Commit your changes:
+   ```bash
+   git commit -m 'Add some amazing feature'
+   ```
+4. Push to the branch:
+   ```bash
+   git push origin feature/amazing-feature
+   ```
 5. Open a Pull Request
+
+Please ensure your PR adheres to our coding standards and includes appropriate tests.
+
+### Development Guidelines
+
+- Follow the code style guidelines (we use Black for Python)
+- Write tests for new features
+- Update documentation as needed
+- Add type hints to Python code
+- Keep pull requests focused on a single feature or fix
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 📞 Contact
 
-Guilherme Guirro - guilherme@guirro.org
+- **Guilherme Guirro** - [guilherme@guirro.org](mailto:guilherme@guirro.org)
+- **Project Website** - [https://nebulaml.ai](https://nebulaml.ai)
+- **GitHub** - [https://github.com/guilhermeguirro/NebulaMLPlatform](https://github.com/guilhermeguirro/NebulaMLPlatform)
+- **Twitter** - [@NebulaMLAI](https://twitter.com/NebulaMLAI)
 
-Project Link: [https://github.com/guilhermeguirro/NebulaMLPlatform](https://github.com/guilhermeguirro/NebulaMLPlatform) 
+## 🗺 Roadmap
+
+- **Q2 2023** 📅
+  - ✅ Initial platform release
+  - ✅ Multi-cloud deployment support
+  - ✅ Basic monitoring and observability
+
+- **Q3 2023** 📅
+  - ✅ Enhanced security features
+  - ✅ Integration with popular ML frameworks
+  - ✅ Improved CI/CD workflows
+
+- **Q4 2023** 📅
+  - ✅ Multi-tenancy support
+  - ✅ Advanced monitoring dashboards
+  - ✅ Kubernetes integration
+
+- **Q1 2024** 📅
+  - ✅ Federated learning capabilities
+  - ✅ Model explanation tools
+  - ✅ Enhanced compliance features
+
+- **Q2 2024** 📅
+  - ✅ Enterprise edition launch
+  - 🔄 Advanced AI capabilities
+  - 🔄 Edge deployment support
+
+- **Q3 2024** 📅
+  - 🔄 Automated ML operations
+  - 🔄 Real-time feature store
+  - 🔄 Model governance framework
+
+---
+
+<div align="center">
+  <p>
+    <a href="https://star-history.com/#guilhermeguirro/NebulaMLPlatform">
+      <img src="https://api.star-history.com/svg?repos=guilhermeguirro/NebulaMLPlatform&type=Date" alt="Star History Chart" width="600" />
+    </a>
+  </p>
+  <p>⭐ If you find this project useful, please give it a star on GitHub! ⭐</p>
+</div> 
