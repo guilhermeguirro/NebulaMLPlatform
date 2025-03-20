@@ -1,116 +1,170 @@
-# NeutronPay
+# NebulaML Platform
 
-A secure, scalable, and compliant financial services platform built with modern technologies and best practices.
+A comprehensive machine learning platform for building, training, deploying, and monitoring ML models in production environments. NebulaML provides an end-to-end solution for the entire ML lifecycle with a focus on reliability, scalability, and ease of use.
 
 ## Features
 
-- **Secure Transaction Processing**: Enterprise-grade security with end-to-end encryption
-- **Fraud Detection**: Advanced AI-powered fraud detection and prevention
-- **Real-time Analytics**: Comprehensive monitoring and analytics dashboard
-- **Compliance**: Built-in compliance with financial regulations
-- **Scalability**: Designed for high throughput and reliability
-- **API-First**: RESTful API with OpenAPI documentation
+- **API-First Architecture**: RESTful API for all ML operations
+- **Model Management**: Version control and lifecycle management for ML models
+- **Automated Deployment**: Seamless deployment to various environments
+- **Monitoring & Observability**: Real-time metrics and logs
+- **Scalable Infrastructure**: Built to handle production workloads
+- **Security**: Role-based access control and data encryption
 
-## Tech Stack
+## Architecture
 
-- **Backend**: Python 3.11, FastAPI
-- **Database**: PostgreSQL
-- **Caching**: Redis
-- **Monitoring**: Prometheus, Grafana
-- **Tracing**: OpenTelemetry, Jaeger
-- **AI/ML**: Claude AI
-- **Security**: JWT, OAuth2, Encryption
+NebulaML Platform consists of the following core components:
+
+- **API Service**: The central RESTful API for all platform operations
+- **AI Service**: Handles model training, inference, and AI-specific operations
+- **Transaction Service**: Manages data flow and transaction processing
+- **Fraud Detection Service**: Specialized service for fraud detection models
+- **Monitoring**: Prometheus and Grafana for metrics and visualization
+- **Security**: HashiCorp Vault for secrets management
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.10 or higher
-- Docker and Docker Compose
-- Poetry for dependency management
+- Docker & Docker Compose
+- Python 3.9+
+- Git
 
-### Installation
+### Local Development
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/neutronpay.git
-   cd neutronpay
+   git clone https://github.com/guilhermeguirro/NebulaMLPlatform.git
+   cd NebulaMLPlatform
    ```
 
-2. Install dependencies:
+2. Start the platform with Docker Compose:
    ```bash
-   poetry install
+   docker-compose up
    ```
 
-3. Set up environment variables:
+3. Access the API at http://localhost:8000
+
+### Configuration
+
+Configuration is managed through environment variables. See `docker-compose.yml` for available options.
+
+## Deployment Options
+
+### Azure Deployment
+
+NebulaML Platform can be deployed to Azure using multiple methods:
+
+#### Using GitHub Actions (Recommended)
+
+The repository includes GitHub Actions workflows that automate the deployment process:
+
+1. Ensure you have an Azure account and subscription
+2. Create Azure service principal credentials:
    ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
+   az ad sp create-for-rbac --name "nebulaml-github-actions" \
+                           --role contributor \
+                           --scopes /subscriptions/<subscription-id> \
+                           --sdk-auth
    ```
+3. Add the JSON output as a GitHub repository secret named `AZURE_CREDENTIALS`
+4. Trigger the workflow manually from the GitHub Actions tab or push to the main branch
 
-4. Start the services:
+The workflow will:
+- Create a resource group
+- Deploy an Azure Container Registry
+- Build and push the Docker image
+- Deploy to Azure Container Apps
+- Output the API URL
+
+#### Using Azure CLI Script
+
+For manual deployment using the Azure CLI:
+
+1. Make the deployment script executable:
    ```bash
-   docker-compose up -d
+   chmod +x ./azure/deploy.sh
    ```
 
-### Development
-
-1. Activate the virtual environment:
+2. Run the deployment script:
    ```bash
-   poetry shell
+   ./azure/deploy.sh
    ```
 
-2. Run the development server:
+#### Using Terraform
+
+For infrastructure-as-code deployment:
+
+1. Navigate to the terraform directory:
    ```bash
-   python -m app
+   cd terraform
    ```
 
-3. Run tests:
+2. Initialize Terraform:
    ```bash
-   pytest
+   terraform init
    ```
 
-### API Documentation
+3. Plan the deployment:
+   ```bash
+   terraform plan
+   ```
 
-Once the server is running, you can access:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- OpenAPI Schema: http://localhost:8000/openapi.json
+4. Apply the changes:
+   ```bash
+   terraform apply
+   ```
 
-## Architecture
+### Other Cloud Providers
 
-The platform is built with a microservices architecture:
+Deployment guides for AWS, GCP, and others are coming soon.
 
-- **API Service**: Main FastAPI application
-- **AI Service**: Claude AI integration for analysis
-- **Fraud Detection Service**: Real-time fraud detection
-- **Transaction Service**: Transaction processing and management
+## API Documentation
 
-## Security
+Once deployed, the API documentation is available at `/docs` or `/redoc` endpoints.
 
-- All API endpoints are protected with JWT authentication
-- Sensitive data is encrypted at rest and in transit
-- Rate limiting and request validation
-- Regular security audits and updates
+Core API endpoints:
+
+- `/api/health`: Health check endpoint
+- `/api/v1/models`: Model management
+- `/api/v1/transactions`: Transaction operations
+- `/api/v1/fraud`: Fraud detection operations
+- `/api/v1/ai`: AI service operations
 
 ## Monitoring
 
-- Prometheus metrics endpoint: http://localhost:8000/metrics
-- Grafana dashboard: http://localhost:3000
-- Jaeger tracing: http://localhost:16686
+NebulaML Platform includes built-in monitoring using Prometheus and Grafana:
+
+- **Prometheus**: Collects and stores metrics
+- **Grafana**: Visualizes metrics with customizable dashboards
+
+In the default setup, Prometheus is available at http://localhost:9090 and Grafana at http://localhost:3000.
+
+## Security
+
+Security is implemented with:
+
+- HashiCorp Vault for secrets management
+- Role-based access control
+- HTTPS for all external communications
+- Encrypted data storage
 
 ## Contributing
 
+Contributions are welcome! Please feel free to submit a Pull Request.
+
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
-## Support
+## Contact
 
-For support, please open an issue in the GitHub repository or contact the maintainers. 
+Guilherme Guirro - guilherme@guirro.org
+
+Project Link: [https://github.com/guilhermeguirro/NebulaMLPlatform](https://github.com/guilhermeguirro/NebulaMLPlatform) 
