@@ -147,7 +147,96 @@ For infrastructure-as-code deployment:
 
 Deployment guides for AWS, GCP, and others are coming soon.
 
-## 📚 API Documentation
+### AWS Deployment ☁️
+
+NebulaML Platform can be deployed to AWS using the following methods:
+
+#### Using GitHub Actions 🔄
+
+1. Create AWS credentials:
+   ```bash
+   aws iam create-user --user-name nebulaml-github-actions
+   aws iam attach-user-policy --user-name nebulaml-github-actions --policy-arn arn:aws:iam::aws:policy/AmazonECR-FullAccess
+   aws iam attach-user-policy --user-name nebulaml-github-actions --policy-arn arn:aws:iam::aws:policy/AmazonECS-FullAccess
+   aws iam create-access-key --user-name nebulaml-github-actions
+   ```
+
+2. Add AWS credentials to GitHub repository secrets:
+   - `AWS_ACCESS_KEY_ID`: Your AWS access key
+   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
+   - `AWS_REGION`: Your preferred AWS region (e.g., `us-east-1`)
+
+3. Trigger the workflow from GitHub Actions or push to the main branch
+
+The workflow will:
+- Create an ECR repository
+- Build and push the Docker image to ECR
+- Deploy to AWS Fargate/ECS
+- Set up Application Load Balancer
+- Output the API URL
+
+#### Using Terraform for AWS 🏗️
+
+1. Navigate to the terraform/aws directory:
+   ```bash
+   cd terraform/aws
+   ```
+
+2. Initialize Terraform:
+   ```bash
+   terraform init
+   ```
+
+3. Apply the changes:
+   ```bash
+   terraform apply
+   ```
+
+### GCP Deployment ☁️
+
+NebulaML Platform can be deployed to Google Cloud Platform using:
+
+#### Using GitHub Actions 🔄
+
+1. Create a service account and key:
+   ```bash
+   gcloud iam service-accounts create nebulaml-github-actions
+   gcloud projects add-iam-policy-binding [YOUR_PROJECT_ID] \
+     --member="serviceAccount:nebulaml-github-actions@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+     --role="roles/container.admin"
+   gcloud projects add-iam-policy-binding [YOUR_PROJECT_ID] \
+     --member="serviceAccount:nebulaml-github-actions@[YOUR_PROJECT_ID].iam.gserviceaccount.com" \
+     --role="roles/storage.admin"
+   gcloud iam service-accounts keys create key.json \
+     --iam-account=nebulaml-github-actions@[YOUR_PROJECT_ID].iam.gserviceaccount.com
+   ```
+
+2. Add the GCP service account key to GitHub repository secrets:
+   - `GCP_PROJECT_ID`: Your GCP project ID
+   - `GCP_SA_KEY`: The content of the key.json file
+
+3. Trigger the workflow from GitHub Actions
+
+The workflow will:
+- Build and push the Docker image to Google Container Registry (GCR)
+- Deploy to Cloud Run or GKE
+- Set up HTTPS load balancing
+- Output the API URL
+
+#### Using Terraform for GCP 🏗️
+
+1. Navigate to the terraform/gcp directory:
+   ```bash
+   cd terraform/gcp
+   ```
+
+2. Initialize and apply:
+   ```bash
+   terraform init
+   terraform apply -var="project_id=[YOUR_PROJECT_ID]"
+   ```
+
+## �� API Documentation
 
 Once deployed, the API documentation is available at `/docs` or `/redoc` endpoints.
 
