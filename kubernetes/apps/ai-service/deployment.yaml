@@ -1,0 +1,362 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: ai-services
+  labels:
+    app: ai-service
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ai-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: ai-service
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/agent-inject-secret-claude: "secret/data/ai-service/claude"
+        vault.hashicorp.com/role: "ai-service"
+        seccomp.security.alpha.kubernetes.io/pod: "runtime/default"
+    spec:
+      serviceAccountName: ai-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: ai-service
+        image: ${REGISTRY}/ai-service:${TAG}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: CLAUDE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: claude-credentials
+              key: api-key
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-service-secrets
+              key: jwt-secret
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-service-secrets
+              key: encryption-key
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          privileged: false
+          procMount: Default
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTPS
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTPS
+          failureThreshold: 30
+          periodSeconds: 10
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+      volumes:
+      - name: tmp
+        emptyDir: 
+          medium: Memory
+          sizeLimit: "100Mi"
+      - name: certs
+        secret:
+          secretName: ai-service-tls
+      initContainers:
+      - name: security-context-setup
+        image: busybox
+        command: ['sh', '-c', 'chmod 600 /etc/certs/* && chown 1000:2000 /etc/certs/*']
+        volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - ai-service
+            topologyKey: "kubernetes.io/hostname"
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: ai-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: ai-services
+  labels:
+    app: ai-service
+spec:
+  ports:
+  - port: 443
+    targetPort: http
+    protocol: TCP
+    name: https
+  selector:
+    app: ai-service
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: ai-service
+  namespace: ai-services
+spec:
+  hosts:
+  - "ai-service.example.com"
+  gateways:
+  - istio-system/ingress-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/v1/ai
+    route:
+    - destination:
+        host: ai-service
+        port:
+          number: 443
+    corsPolicy:
+      allowOrigins:
+        - exact: "https://example.com"
+      allowMethods:
+        - POST
+        - GET
+        - OPTIONS
+      allowHeaders:
+        - Authorization
+        - Content-Type
+      maxAge: "24h"
+    retries:
+      attempts: 3
+      perTryTimeout: "2s"
+      retryOn: "connect-failure,refused-stream,unavailable,cancelled,deadline-exceeded,resource-exhausted"
+    fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s
+      abort:
+        percentage:
+          value: 0.1
+        httpStatus: 500
+    tls:
+      mode: STRICT
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: ai-service
+  namespace: ai-services
+spec:
+  selector:
+    matchLabels:
+      app: ai-service
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+        namespaces: ["istio-system"]
+    to:
+    - operation:
+        methods: ["POST", "GET"]
+        paths: ["/generate", "/health", "/metrics", "/config"]
+    when:
+    - key: request.auth.claims[iss]
+      values: ["https://your-auth-provider.com"]
+    - key: request.auth.claims[aud]
+      values: ["ai-service"]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ai-service
+  namespace: ai-services
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ai-service
+  endpoints:
+  - port: https
+    path: /metrics
+    interval: 15s
+    scheme: https
+    tlsConfig:
+      insecureSkipVerify: false
+      caFile: /etc/prometheus/secrets/ai-service-ca/tls.crt
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: ai-service
+  namespace: ai-services
+spec:
+  podSelector:
+    matchLabels:
+      app: ai-service
+  port: 8000
+  proxyProtocol: HTTP/1
+  retryBudget:
+    ttl: 10s
+    minRetryCost: 5
+    retryRatio: 0.2
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ai-service
+  namespace: ai-services
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ai-service
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ai-service
+  namespace: ai-services
+spec:
+  podSelector:
+    matchLabels:
+      app: ai-service
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 169.254.0.0/16
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ai-service-cert
+  namespace: ai-services
+spec:
+  secretName: ai-service-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+    - Your Organization
+  commonName: ai-service.example.com
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+  - ai-service.example.com
+  - ai-service.ai-services.svc.cluster.local
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer 
