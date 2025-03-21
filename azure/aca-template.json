@@ -4,7 +4,6 @@
     "parameters": {
         "environment_name": {
             "type": "string",
-            "defaultValue": "nebulaml-environment",
             "metadata": {
                 "description": "Name of the Container Apps environment"
             }
@@ -13,52 +12,43 @@
             "type": "string",
             "defaultValue": "[resourceGroup().location]",
             "metadata": {
-                "description": "Location for the Container Apps environment"
-            }
-        },
-        "logAnalyticsWorkspaceName": {
-            "type": "string",
-            "defaultValue": "[format('logs-{0}', parameters('environment_name'))]",
-            "metadata": {
-                "description": "Name of the Log Analytics workspace"
+                "description": "Location for all resources"
             }
         },
         "containerRegistryServer": {
             "type": "string",
             "metadata": {
-                "description": "Container Registry server URL"
+                "description": "Container registry server URL"
             }
         },
         "containerRegistryUsername": {
             "type": "string",
             "metadata": {
-                "description": "Container Registry username"
+                "description": "Container registry username"
             }
         },
         "containerRegistryPassword": {
             "type": "securestring",
             "metadata": {
-                "description": "Container Registry password"
+                "description": "Container registry password"
             }
         },
         "apiImageTag": {
             "type": "string",
-            "defaultValue": "latest",
             "metadata": {
-                "description": "API image tag"
+                "description": "Tag for the API container image"
             }
         },
         "keyVaultName": {
             "type": "string",
             "metadata": {
-                "description": "Name of the Key Vault to integrate with"
+                "description": "Name of the Key Vault"
             }
         }
     },
     "variables": {
-        "logAnalyticsWorkspaceName": "[parameters('logAnalyticsWorkspaceName')]",
-        "keyVaultId": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
-        "apiSecretName": "nebulaml-api-secret"
+        "logAnalyticsWorkspaceName": "[format('{0}-logs', parameters('environment_name'))]",
+        "appInsightsName": "[format('{0}-insights', parameters('environment_name'))]"
     },
     "resources": [
         {
@@ -67,14 +57,28 @@
             "name": "[variables('logAnalyticsWorkspaceName')]",
             "location": "[parameters('location')]",
             "properties": {
-                "sku": {
-                    "name": "PerGB2018"
-                },
                 "retentionInDays": 30,
                 "features": {
-                    "enableLogAccessUsingOnlyResourcePermissions": true
+                    "searchVersion": 1
+                },
+                "sku": {
+                    "name": "PerGB2018"
                 }
             }
+        },
+        {
+            "type": "Microsoft.Insights/components",
+            "apiVersion": "2020-02-02",
+            "name": "[variables('appInsightsName')]",
+            "location": "[parameters('location')]",
+            "kind": "web",
+            "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))]"
+            ]
         },
         {
             "type": "Microsoft.App/managedEnvironments",
@@ -85,7 +89,7 @@
                 "appLogsConfiguration": {
                     "destination": "log-analytics",
                     "logAnalyticsConfiguration": {
-                        "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName')), '2021-06-01').customerId]",
+                        "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName'))).customerId]",
                         "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName')), '2021-06-01').primarySharedKey]"
                     }
                 }
@@ -95,103 +99,57 @@
             ]
         },
         {
-            "type": "Microsoft.KeyVault/vaults/secrets",
-            "apiVersion": "2021-06-01-preview",
-            "name": "[format('{0}/{1}', parameters('keyVaultName'), variables('apiSecretName'))]",
-            "properties": {
-                "value": "This is a sample API secret stored in Key Vault"
-            }
-        },
-        {
             "type": "Microsoft.App/containerApps",
             "apiVersion": "2022-03-01",
             "name": "nebulaml-api",
             "location": "[parameters('location')]",
-            "identity": {
-                "type": "SystemAssigned"
-            },
             "properties": {
                 "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environment_name'))]",
                 "configuration": {
-                    "activeRevisionsMode": "Single",
                     "secrets": [
                         {
-                            "name": "container-registry-password",
+                            "name": "registry-password",
                             "value": "[parameters('containerRegistryPassword')]"
-                        },
-                        {
-                            "name": "keyvault-api-secret",
-                            "keyVaultUrl": "[format('https://{0}.vault.azure.net/secrets/{1}', parameters('keyVaultName'), variables('apiSecretName'))]"
                         }
                     ],
                     "registries": [
                         {
                             "server": "[parameters('containerRegistryServer')]",
                             "username": "[parameters('containerRegistryUsername')]",
-                            "passwordSecretRef": "container-registry-password"
+                            "passwordSecretRef": "registry-password"
                         }
                     ],
                     "ingress": {
                         "external": true,
-                        "targetPort": 8000,
-                        "traffic": [
-                            {
-                                "latestRevision": true,
-                                "weight": 100
-                            }
-                        ]
+                        "targetPort": 8000
                     }
                 },
                 "template": {
                     "containers": [
                         {
                             "name": "nebulaml-api",
-                            "image": "[concat(parameters('containerRegistryServer'), '/nebulaml-api:', parameters('apiImageTag'))]",
-                            "resources": {
-                                "cpu": "0.5",
-                                "memory": "1Gi"
-                            },
+                            "image": "[format('{0}/nebulaml-api:{1}', parameters('containerRegistryServer'), parameters('apiImageTag'))]",
                             "env": [
-                                {
-                                    "name": "API_HOST",
-                                    "value": "0.0.0.0"
-                                },
-                                {
-                                    "name": "API_PORT",
-                                    "value": "8000"
-                                },
-                                {
-                                    "name": "API_WORKERS",
-                                    "value": "2"
-                                },
-                                {
-                                    "name": "API_RELOAD",
-                                    "value": "false"
-                                },
-                                {
-                                    "name": "API_LOG_LEVEL",
-                                    "value": "INFO"
-                                },
                                 {
                                     "name": "KEY_VAULT_NAME",
                                     "value": "[parameters('keyVaultName')]"
-                                },
-                                {
-                                    "name": "API_SECRET",
-                                    "secretRef": "keyvault-api-secret"
                                 }
-                            ]
+                            ],
+                            "resources": {
+                                "cpu": "0.5",
+                                "memory": "1Gi"
+                            }
                         }
                     ],
                     "scale": {
                         "minReplicas": 1,
-                        "maxReplicas": 5,
+                        "maxReplicas": 10,
                         "rules": [
                             {
                                 "name": "http-rule",
                                 "http": {
                                     "metadata": {
-                                        "concurrentRequests": "50"
+                                        "concurrentRequests": "100"
                                     }
                                 }
                             }
@@ -200,32 +158,14 @@
                 }
             },
             "dependsOn": [
-                "[resourceId('Microsoft.App/managedEnvironments', parameters('environment_name'))]",
-                "[format('{0}/{1}', parameters('keyVaultName'), variables('apiSecretName'))]"
-            ]
-        },
-        {
-            "type": "Microsoft.Authorization/roleAssignments",
-            "apiVersion": "2020-04-01-preview",
-            "name": "[guid(resourceGroup().id, 'nebulaml-api', 'Key Vault Secrets User')]",
-            "properties": {
-                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/', '4633458b-17de-408a-b874-0445c86b69e6')]", 
-                "principalId": "[reference(resourceId('Microsoft.App/containerApps', 'nebulaml-api'), '2022-03-01', 'full').identity.principalId]",
-                "principalType": "ServicePrincipal"
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.App/containerApps', 'nebulaml-api')]"
+                "[resourceId('Microsoft.App/managedEnvironments', parameters('environment_name'))]"
             ]
         }
     ],
     "outputs": {
         "apiUrl": {
             "type": "string",
-            "value": "[concat('https://', reference(resourceId('Microsoft.App/containerApps', 'nebulaml-api')).configuration.ingress.fqdn)]"
-        },
-        "containerAppIdentity": {
-            "type": "string",
-            "value": "[reference(resourceId('Microsoft.App/containerApps', 'nebulaml-api'), '2022-03-01', 'full').identity.principalId]"
+            "value": "[reference(resourceId('Microsoft.App/containerApps', 'nebulaml-api')).configuration.ingress.fqdn]"
         }
     }
 } 

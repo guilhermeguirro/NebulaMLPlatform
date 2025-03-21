@@ -12,13 +12,13 @@ on:
   workflow_dispatch:
 
 env:
-  RESOURCE_GROUP: nebulaml-rg
+  RESOURCE_GROUP: nebulaml-platform-rg
   LOCATION: eastus
-  REGISTRY_NAME: nebulamlregistry
+  REGISTRY_NAME: nebulamlplatform
   ENVIRONMENT_NAME: nebulaml-env
   API_IMAGE_TAG: ${{ github.sha }}
-  KEY_VAULT_NAME: nebulaml-kv
-  AZURE_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  KEY_VAULT_NAME: nebulaml-platform-kv
+  AZURE_SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
 permissions:
   id-token: write
@@ -49,7 +49,7 @@ jobs:
           az keyvault create --name ${{ env.KEY_VAULT_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --location ${{ env.LOCATION }} --sku standard
           
           # Assign the current service principal access to the Key Vault
-          CURRENT_SP_OBJECT_ID=$(az ad signed-in-user show --query id -o tsv)
+          CURRENT_SP_OBJECT_ID=$(az ad sp show --id ${{ secrets.AZURE_CLIENT_ID }} --query id -o tsv)
           az keyvault set-policy --name ${{ env.KEY_VAULT_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --object-id $CURRENT_SP_OBJECT_ID \
@@ -77,10 +77,8 @@ jobs:
           az keyvault secret set --vault-name ${{ env.KEY_VAULT_NAME }} --name "acr-username" --value "$ACR_USERNAME"
           az keyvault secret set --vault-name ${{ env.KEY_VAULT_NAME }} --name "acr-password" --value "$ACR_PASSWORD"
           
-          # Output for use in this workflow
           echo "server=$ACR_SERVER" >> $GITHUB_OUTPUT
           echo "username=$ACR_USERNAME" >> $GITHUB_OUTPUT
-          # Mask the password to prevent it from showing in logs
           echo "::add-mask::$ACR_PASSWORD"
           echo "password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
       
